@@ -3,73 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mobile 3D Craft</title>
+    <title>Craft World - Mobile</title>
     <style>
-        /* 기본 레이아웃: 스크롤 방지 및 하늘색 배경 */
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; }
+        /* 기본 스타일 및 스크롤 방지 */
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; overscroll-behavior: none; }
         
         /* 3D 무대 설정 */
         #stage {
             width: 100vw; height: 100vh;
-            perspective: 1000px; /* 원근감 */
+            perspective: 1000px;
             display: flex; align-items: center; justify-content: center;
         }
 
+        /* 월드 컨테이너 (배경 맵이 이동함) */
         #world {
+            position: absolute;
             width: 0; height: 0;
             transform-style: preserve-3d;
-            /* 카메라 각도: 약간 위에서 내려다보는 시점 */
-            transform: rotateX(-25deg) rotateY(45deg); 
+            /* 초기 카메라 각도: 위에서 내려다봄 */
+            transform: translateZ(-400px) rotateX(-30deg) rotateY(45deg); 
+            transition: transform 0.1s linear; /* 부드러운 이동 */
         }
 
-        /* 바닥 (잔디 느낌) */
-        .floor {
-            position: absolute; width: 2000px; height: 2000px;
-            background: #567d46;
-            background-image: linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
-            background-size: 50px 50px;
-            transform: translate(-50%, -50%) rotateX(90deg) translateZ(-50px);
-        }
-
-        /* 캐릭터 기본 구조 */
-        #player {
-            position: absolute; width: 40px; height: 60px;
+        /* --- 블록 맵 (산과 바다) --- */
+        .block {
+            position: absolute;
+            width: 50px; height: 50px;
             transform-style: preserve-3d;
-            transform: translate(-50%, -50%); /* 중앙 정렬 */
-            transition: transform 0.05s linear;
+            transform-origin: center center;
+        }
+        .block .face {
+            position: absolute;
+            width: 50px; height: 50px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        /* 블록 면 설정 */
+        .block .front  { transform: translateZ(25px); }
+        .block .back   { transform: rotateY(180deg) translateZ(25px); }
+        .block .left   { transform: rotateY(-90deg) translateZ(25px); }
+        .block .right  { transform: rotateY(90deg) translateZ(25px); }
+        .block .top    { transform: rotateX(90deg) translateZ(25px); }
+        .block .bottom { transform: rotateX(-90deg) translateZ(25px); }
+
+        /* 잔디 블록 (산) */
+        .block.grass .top { background: #567d46; }
+        .block.grass .face:not(.top) { background: #795548; } /* 옆면/밑면 갈색 */
+
+        /* 물 블록 (바다) */
+        .block.water .face { background: rgba(33, 150, 243, 0.7); border: none; }
+
+        /* --- 속이 찬 입체 캐릭터 (화면 중앙 고정) --- */
+        #player {
+            position: fixed; /* 화면 고정 */
+            width: 40px; height: 60px;
+            transform-style: preserve-3d;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%) rotateY(0deg); /* 초기 방향 */
+            z-index: 10; /* 맵보다 위에 표시 */
         }
 
-        /* 큐브 공통 스타일 */
-        .cube { position: absolute; transform-style: preserve-3d; }
-        .face { position: absolute; background: #ff9800; border: 1px solid rgba(0,0,0,0.2); box-sizing: border-box; }
+        /* 큐브 공통 스타일 (팔, 몸통용) */
+        .cube { position: absolute; transform-style: preserve-3d; transform-origin: center center; }
+        .cube .face { position: absolute; border: 1px solid rgba(0,0,0,0.2); box-sizing: border-box; }
 
-        /* 캐릭터 파츠별 설정 */
+        /* 파츠별 색상 변수 */
+        :root { --skin: #fccb9f; --hair: #4e342e; --shirt: #00bcd4; --pants: #3f51b5; }
+
+        /* 머리 (24x24x24) - 이전과 동일 */
         .head { width: 24px; height: 24px; top: -26px; left: 8px; }
-        .head .face { width: 24px; height: 24px; background: #fccb9f; }
-        .head .front { transform: translateZ(12px); border: 2px solid #333; } /* 얼굴 */
-        .head .back  { transform: rotateY(180deg) translateZ(12px); background: #4e342e; }
-        .head .top   { transform: rotateX(90deg) translateZ(12px); background: #4e342e; }
+        .head .face { width: 24px; height: 24px; background: var(--skin); }
+        .head .front { transform: translateZ(12px); border: 2px solid #333; }
+        .head .back  { transform: rotateY(180deg) translateZ(12px); background: var(--hair); }
+        .head .top   { transform: rotateX(90deg) translateZ(12px); background: var(--hair); }
         .head .left  { transform: rotateY(-90deg) translateZ(12px); }
         .head .right { transform: rotateY(90deg) translateZ(12px); }
 
+        /* 몸통 (속이 찬 큐브, 24x32x16) */
         .torso { width: 24px; height: 32px; top: 0; left: 8px; }
-        .torso .face { width: 24px; height: 32px; background: #00bcd4; }
-        .torso .front { transform: translateZ(8px); }
-        .torso .back  { transform: rotateY(180deg) translateZ(8px); }
-        .torso .left  { width: 16px; transform: rotateY(-90deg) translateZ(0px); }
-        .torso .right { width: 16px; transform: rotateY(90deg) translateZ(24px); }
-        .torso .top   { height: 16px; transform: rotateX(90deg) translateZ(8px); }
+        .torso .face { background: var(--shirt); }
+        .torso .front { width: 24px; height: 32px; transform: translateZ(8px); }
+        .torso .back  { width: 24px; height: 32px; transform: rotateY(180deg) translateZ(8px); }
+        .torso .left  { width: 16px; height: 32px; transform: rotateY(-90deg) translateZ(8px); }
+        .torso .right { width: 16px; height: 32px; transform: rotateY(90deg) translateZ(16px); }
+        .torso .top   { width: 24px; height: 16px; transform: rotateX(90deg) translateZ(8px); }
+        .torso .bottom{ width: 24px; height: 16px; transform: rotateX(-90deg) translateZ(24px); }
 
-        .limb { width: 12px; height: 30px; transform-origin: top center; }
-        .limb .face { width: 12px; height: 30px; }
-        .limb .front { transform: translateZ(6px); }
-        .limb .back  { transform: rotateY(180deg) translateZ(6px); }
-        .arm .face { background: #00bcd4; }
-        .leg .face { background: #3f51b5; }
+        /* 팔/다리 공통 (속이 찬 큐브, 12x32x12) */
+        .limb { width: 12px; height: 32px; transform-origin: top center; }
+        .limb .face { background: #fff; } /* 기본값 */
+        .limb .front { width: 12px; height: 32px; transform: translateZ(6px); }
+        .limb .back  { width: 12px; height: 32px; transform: rotateY(180deg) translateZ(6px); }
+        .limb .left  { width: 12px; height: 32px; transform: rotateY(-90deg) translateZ(6px); }
+        .limb .right { width: 12px; height: 32px; transform: rotateY(90deg) translateZ(6px); }
+        .limb .top   { width: 12px; height: 12px; transform: rotateX(90deg) translateZ(6px); }
+        .limb .bottom{ width: 12px; height: 12px; transform: rotateX(-90deg) translateZ(26px); }
 
+        /* 팔/다리 색상 및 위치 */
+        .arm .face { background: var(--shirt); }
         .arm.left  { left: -4px; top: 0; }
         .arm.right { left: 32px; top: 0; }
+        .leg .face { background: var(--pants); }
         .leg.left  { left: 8px; top: 32px; }
         .leg.right { left: 20px; top: 32px; }
 
@@ -82,31 +115,56 @@
         @keyframes swing { from { transform: rotateX(-30deg); } to { transform: rotateX(30deg); } }
         @keyframes swing-rev { from { transform: rotateX(30deg); } to { transform: rotateX(-30deg); } }
 
-        /* 점프 애니메이션 */
+        /* 점프 애니메이션 (캐릭터 자체 이동) */
         .jump-act { animation: jump-ani 0.5s ease-out; }
-        @keyframes jump-ani { 0%, 100% { margin-top: 0; } 50% { margin-top: -100px; } }
+        @keyframes jump-ani { 
+            0%, 100% { transform: translate(-50%, -50%) translateY(0); } 
+            50% { transform: translate(-50%, -50%) translateY(-100px); } 
+        }
 
-        /* UI 레이아웃 */
-        .ui { position: fixed; bottom: 40px; width: 100%; display: flex; justify-content: space-between; padding: 0 40px; box-sizing: border-box; pointer-events: none; }
-        .joy-base { width: 120px; height: 120px; background: rgba(0,0,0,0.2); border-radius: 50%; position: relative; pointer-events: auto; border: 2px solid #fff; }
-        #stick { width: 50px; height: 50px; background: #fff; border-radius: 50%; position: absolute; left: 35px; top: 35px; }
-        .btn-jump { width: 80px; height: 80px; background: rgba(0,0,0,0.5); border: 3px solid #fff; border-radius: 50%; color: #fff; font-weight: bold; font-size: 16px; pointer-events: auto; }
+        /* --- UI 컨트롤러 (모바일 최적화) --- */
+        .ui { 
+            position: fixed; bottom: 20px; width: 100%; 
+            display: flex; justify-content: space-between; align-items: flex-end;
+            padding: 0 20px; box-sizing: border-box; pointer-events: none; z-index: 20; 
+        }
+
+        /* 조이스틱 (크기 축소) */
+        .joy-base { 
+            width: 80px; height: 80px; background: rgba(0,0,0,0.3); 
+            border-radius: 50%; position: relative; pointer-events: auto; border: 2px solid #fff; 
+        }
+        #stick { 
+            width: 40px; height: 40px; background: #fff; 
+            border-radius: 50%; position: absolute; left: 20px; top: 20px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        /* 점프 버튼 (크기 축소 및 우측 하단 배치) */
+        .btn-jump { 
+            width: 60px; height: 60px; background: rgba(0,0,0,0.6); 
+            border: 3px solid #fff; border-radius: 50%; color: #fff; 
+            font-weight: bold; font-size: 14px; pointer-events: auto; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .btn-jump:active { background: rgba(255,255,255,0.3); transform: scale(0.9); }
+
     </style>
 </head>
 <body>
 
 <div id="stage">
     <div id="world">
-        <div class="floor"></div>
-        <div id="player">
-            <div class="cube head"><div class="face front"></div><div class="face back"></div><div class="face top"></div><div class="face left"></div><div class="face right"></div></div>
-            <div class="cube torso"><div class="face front"></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face top"></div></div>
-            <div class="cube limb arm left"><div class="face front"></div><div class="face back"></div></div>
-            <div class="cube limb arm right"><div class="face front"></div><div class="face back"></div></div>
-            <div class="cube limb leg left"><div class="face front"></div><div class="face back"></div></div>
-            <div class="cube limb leg right"><div class="face front"></div><div class="face back"></div></div>
         </div>
-    </div>
+</div>
+
+<div id="player">
+    <div class="cube head"><div class="face front"></div><div class="face back"></div><div class="face top"></div><div class="face left"></div><div class="face right"></div></div>
+    <div class="cube torso"><div class="face front"></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face top"></div><div class="face bottom"></div></div>
+    <div class="cube limb arm left"><div class="face front"></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face top"></div><div class="face bottom"></div></div>
+    <div class="cube limb arm right"><div class="face front"></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face top"></div><div class="face bottom"></div></div>
+    <div class="cube limb leg left"><div class="face front"></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face bottom"></div></div>
+    <div class="cube limb leg right"><div class="face front"></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face bottom"></div></div>
 </div>
 
 <div class="ui">
@@ -115,61 +173,110 @@
 </div>
 
 <script>
+    const world = document.getElementById('world');
     const player = document.getElementById('player');
     const stick = document.getElementById('stick');
     const joy = document.getElementById('joy');
     const jumpBtn = document.getElementById('jumpBtn');
 
-    let pos = { x: 0, z: 0 };
-    let move = { x: 0, z: 0 };
-    const speed = 5;
+    // --- 맵 생성 (마인크레프트 스타일 산과 바다) ---
+    function createMap() {
+        const mapSize = 10; // 10x10 블록 맵
+        for (let x = -mapSize; x <= mapSize; x++) {
+            for (let z = -mapSize; z <= mapSize; z++) {
+                // 높이값 계산 (단순한 산 형태)
+                const dist = Math.sqrt(x*x + z*z);
+                const height = dist < 5 ? Math.floor(5 - dist) : 0; // 중앙일수록 높음
 
-    // 조이스틱 터치 이벤트
+                if (height > 0) {
+                    // 산 블록 (여러 층 쌓음)
+                    for (let y = 0; y < height; y++) {
+                        createBlock('grass', x * 50, y * 50 - 50, z * 50);
+                    }
+                } else {
+                    // 바다 블록 (평지에 배치)
+                    createBlock('water', x * 50, -50, z * 50);
+                }
+            }
+        }
+    }
+
+    function createBlock(type, x, y, z) {
+        const block = document.createElement('div');
+        block.className = `block ${type}`;
+        block.style.transform = `translate3d(${x}px, ${-y}px, ${z}px)`; // Y축 반전
+
+        const faces = ['front', 'back', 'left', 'right', 'top', 'bottom'];
+        faces.forEach(faceType => {
+            const face = document.createElement('div');
+            face.className = `face ${faceType}`;
+            block.appendChild(face);
+        });
+        world.appendChild(block);
+    }
+    createMap(); // 앱 시작 시 맵 생성
+
+    // --- 조이스틱 제어 (배경 이동 로직) ---
+    let worldPos = { x: 0, z: 0 }; // 캐릭터가 아닌 월드의 위치
+    let moveSpeed = 8;
+    let joystickVec = { x: 0, z: 0 };
+
     const handleMove = (e) => {
         e.preventDefault();
         const touch = e.touches[0];
         const rect = joy.getBoundingClientRect();
-        const centerX = rect.left + 60;
-        const centerY = rect.top + 60;
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
         const dx = touch.clientX - centerX;
         const dy = touch.clientY - centerY;
-        const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 50);
+        const maxDist = rect.width / 2 - stick.offsetWidth / 2;
+        const dist = Math.min(Math.sqrt(dx*dx + dy*dy), maxDist);
         const angle = Math.atan2(dy, dx);
 
         stick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
-        move.x = Math.cos(angle) * (dist / 50);
-        move.z = Math.sin(angle) * (dist / 50);
         
-        if(dist > 5) player.classList.add('walking');
-        else player.classList.remove('walking');
+        // 이동 벡터 계산
+        joystickVec.x = Math.cos(angle) * (dist / maxDist);
+        joystickVec.z = Math.sin(angle) * (dist / maxDist);
+        
+        if(dist > 5) {
+            player.classList.add('walking');
+            // 캐릭터 방향 회전 (배경 이동 방향과 연동)
+            const rotationY = -Math.atan2(joystickVec.z, joystickVec.x) * 180 / Math.PI + 90;
+            player.style.transform = `translate(-50%, -50%) rotateY(${rotationY}deg)`;
+        } else {
+            player.classList.remove('walking');
+        }
     };
 
     joy.addEventListener('touchstart', handleMove);
     joy.addEventListener('touchmove', handleMove);
     joy.addEventListener('touchend', () => {
         stick.style.transform = `translate(0,0)`;
-        move.x = 0; move.z = 0;
+        joystickVec.x = 0; joystickVec.z = 0;
         player.classList.remove('walking');
     });
 
-    // 점프 이벤트
-    jumpBtn.onclick = () => {
+    // --- 점프 이벤트 (캐릭터 자체 점프) ---
+    const doJump = () => {
         if(!player.classList.contains('jump-act')) {
             player.classList.add('jump-act');
             setTimeout(() => player.classList.remove('jump-act'), 500);
         }
     };
+    jumpBtn.addEventListener('click', doJump);
+    jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
 
-    // 프레임 업데이트
+    // --- 프레임 업데이트 (배경 월드 이동) ---
     function update() {
-        pos.x += move.x * speed;
-        pos.z += move.z * speed;
+        // 조이스틱 입력값의 *반대 방향*으로 월드를 이동시킴
+        worldPos.x -= joystickVec.x * moveSpeed;
+        worldPos.z -= joystickVec.z * moveSpeed;
 
-        const rotationY = (move.x !== 0 || move.z !== 0) 
-            ? `rotateY(${-Math.atan2(move.z, move.x) * 180 / Math.PI + 90}deg)` 
-            : player.style.transform.split('rotateY')[1] ? `rotateY${player.style.transform.split('rotateY')[1]}` : 'rotateY(0deg)';
-
-        player.style.transform = `translate3d(${pos.x}px, 0, ${pos.z}px) ${rotationY} translate(-50%, -50%)`;
+        // 월드 컨테이너의 translate3d 값을 업데이트 (X, Z축 이동)
+        // 기존 카메라 회전값(rotateX, rotateY)은 유지해야 함
+        world.style.transform = `translateZ(-400px) rotateX(-30deg) rotateY(45deg) translate3d(${worldPos.x}px, 0, ${worldPos.z}px)`;
+        
         requestAnimationFrame(update);
     }
     update();
