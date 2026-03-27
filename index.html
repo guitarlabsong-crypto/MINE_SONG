@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Lego Character Control</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #e0e0e0; font-family: sans-serif; touch-action: none; }
+        
+        /* 3D 공간 설정 */
+        #stage {
+            width: 100vw; height: 100vh;
+            perspective: 800px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        #world {
+            width: 100%; height: 100%;
+            transform-style: preserve-3d;
+            transform: rotateX(-20px) rotateY(45deg); /* 초기 카메라 각도 */
+        }
+
+        /* 바닥면 */
+        .floor {
+            position: absolute; width: 2000px; height: 2000px;
+            background: repeating-conic-gradient(#f0f0f0 0% 25%, #dcdcdc 0% 50%) 50% / 100px 100px;
+            transform: rotateX(90deg) translateZ(-50px);
+        }
+
+        /* 레고 캐릭터 (간소화된 큐브 형태) */
+        #player {
+            position: absolute; width: 40px; height: 60px;
+            transform-style: preserve-3d;
+            transition: transform 0.1s linear;
+            left: 50%; top: 50%;
+        }
+
+        .brick {
+            position: absolute; background: #ff9800; /* 오렌지색 테마 */
+            border: 1px solid #e65100; box-sizing: border-box;
+        }
+        
+        /* 캐릭터 몸체 구성 */
+        .body { width: 40px; height: 50px; transform-style: preserve-3d; }
+        .face { position: absolute; width: 40px; height: 50px; background: #ff9800; border: 2px solid #333; }
+        .front  { transform: translateZ(10px); }
+        .back   { transform: rotateY(180deg) translateZ(10px); }
+        .left   { width: 20px; transform: rotateY(-90deg) translateZ(10px); }
+        .right  { width: 20px; transform: rotateY(90deg) translateZ(30px); }
+        .top    { height: 20px; transform: rotateX(90deg) translateZ(10px); }
+
+        /* UI 컨트롤러 */
+        .ui-layer {
+            position: fixed; bottom: 20px; width: 100%;
+            display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box;
+            pointer-events: none;
+        }
+
+        .joystick-base {
+            width: 120px; height: 120px; background: rgba(0,0,0,0.2);
+            border-radius: 50%; position: relative; pointer-events: auto;
+        }
+
+        #stick {
+            width: 50px; height: 50px; background: #333; border-radius: 50%;
+            position: absolute; left: 35px; top: 35px; transition: 0.1s;
+        }
+
+        .action-group { display: flex; gap: 10px; align-items: flex-end; pointer-events: auto; }
+        .btn {
+            width: 60px; height: 60px; border-radius: 50%; border: none;
+            background: #333; color: white; font-weight: bold; cursor: pointer;
+        }
+        .btn-run { background: #ff5722; width: 50px; height: 50px; }
+        
+        /* 애니메이션 상태 */
+        .jump { animation: jump-ani 0.5s ease; }
+        @keyframes jump-ani {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-100px); }
+        }
+        .crouch { transform: scaleY(0.6) translateY(20px) !important; }
+    </style>
+</head>
+<body>
+
+<div id="stage">
+    <div id="world">
+        <div class="floor"></div>
+        <div id="player">
+            <div class="body">
+                <div class="face front"></div>
+                <div class="face back"></div>
+                <div class="face left"></div>
+                <div class="face right"></div>
+                <div class="face top"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="ui-layer">
+    <div class="joystick-base" id="joyBase">
+        <div id="stick"></div>
+    </div>
+
+    <div class="action-group">
+        <button class="btn btn-run" id="runBtn">RUN</button>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button class="btn" id="jumpBtn">JUMP</button>
+            <button class="btn" id="crouchBtn">SIT</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const player = document.getElementById('player');
+    const stick = document.getElementById('stick');
+    const joyBase = document.getElementById('joyBase');
+    
+    let pos = { x: 0, z: 0, y: 0 };
+    let move = { x: 0, z: 0 };
+    let speed = 5;
+    let isCrouching = false;
+
+    // 조이스틱 로직
+    joyBase.addEventListener('touchstart', handleMove);
+    joyBase.addEventListener('touchmove', handleMove);
+    joyBase.addEventListener('touchend', () => {
+        stick.style.transform = `translate(0px, 0px)`;
+        move.x = 0; move.z = 0;
+    });
+
+    function handleMove(e) {
+        const rect = joyBase.getBoundingClientRect();
+        const touch = e.touches[0];
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let dx = touch.clientX - centerX;
+        let dy = touch.clientY - centerY;
+        const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 40);
+        const angle = Math.atan2(dy, dx);
+
+        stick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+        
+        move.x = Math.cos(angle) * (dist / 40);
+        move.z = Math.sin(angle) * (dist / 40);
+    }
+
+    // 버튼 액션
+    document.getElementById('jumpBtn').onclick = () => {
+        if(!player.classList.contains('jump')) {
+            player.classList.add('jump');
+            setTimeout(() => player.classList.remove('jump'), 500);
+        }
+    };
+
+    document.getElementById('runBtn').ontouchstart = () => speed = 10;
+    document.getElementById('runBtn').ontouchend = () => speed = 5;
+
+    const crouchBtn = document.getElementById('crouchBtn');
+    crouchBtn.ontouchstart = () => player.classList.add('crouch');
+    crouchBtn.ontouchend = () => player.classList.remove('crouch');
+
+    // 프레임 업데이트
+    function update() {
+        pos.x += move.x * speed;
+        pos.z += move.z * speed;
+
+        // 3D 좌표 적용 (Y축은 점프/쭈그리기로 별도 제어)
+        player.style.transform = `translate3d(${pos.x}px, ${pos.y}px, ${pos.z}px) rotateY(${-Math.atan2(move.z, move.x) * 180 / Math.PI + 90}deg)`;
+        
+        requestAnimationFrame(update);
+    }
+    update();
+</script>
+
+</body>
+</html>
